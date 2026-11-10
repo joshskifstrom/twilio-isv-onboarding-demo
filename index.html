@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mailchimp SMS Onboarding · powered by Twilio — Demo</title>
+<style>
+  :root{
+    --mc-yellow:#FFE01B; --mc-ink:#241C15; --mc-cream:#F6F4EE; --mc-line:#E3DED3; --mc-muted:#6B6259;
+    --mc-green:#007C89; --ok:#1F8A4C; --warn:#B4500F; --bad:#C0352B;
+    --tw-red:#F22F46; --tw-navy:#121C2D; --tw-navy2:#1C2A42; --tw-text:#E8ECF4; --tw-muted:#9AA6BC;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;color:var(--mc-ink);background:var(--mc-cream);overflow:hidden}
+  button{font:inherit;cursor:pointer}
+  a{color:inherit}
+
+  /* ---------- Presenter bar ---------- */
+  .presenter{height:56px;display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--tw-navy);color:var(--tw-text)}
+  .presenter .title{font-weight:700;letter-spacing:.2px;white-space:nowrap}
+  .presenter .title small{font-weight:500;color:var(--tw-muted);margin-left:6px}
+  .tabs{display:flex;background:#0B1220;border-radius:999px;padding:4px;gap:4px}
+  .tab{border:0;background:transparent;color:var(--tw-muted);padding:7px 16px;border-radius:999px;font-weight:600;display:flex;gap:8px;align-items:center}
+  .tab.active{background:#fff;color:var(--tw-navy)}
+  .stepper{display:flex;gap:6px;margin-left:auto;align-items:center}
+  .pill{font-size:12px;padding:5px 10px;border-radius:999px;background:#0B1220;color:var(--tw-muted);border:1px solid #26344F;white-space:nowrap}
+  .pill.ui.active{background:var(--mc-yellow);color:var(--mc-ink);border-color:var(--mc-yellow)}
+  .pill.bts.active{background:var(--tw-red);color:#fff;border-color:var(--tw-red)}
+  .pill.done{color:#C9D2E3;border-color:#3A4B6B}
+  .ctrl{border:1px solid #33435F;background:transparent;color:var(--tw-text);padding:6px 12px;border-radius:8px;font-size:13px}
+  .ctrl:hover{background:#1A2640}
+  .ctrl.primary{background:var(--tw-red);border-color:var(--tw-red);color:#fff}
+
+  /* ---------- Stage ---------- */
+  .stage{position:relative;height:calc(100% - 56px);display:flex}
+  .app{flex:1;min-width:0;display:flex;flex-direction:column;transition:all .45s ease}
+  .stage.bts-open .app{filter:saturate(.85)}
+  .country{display:none;height:100%;flex-direction:column}
+  .country.active{display:flex}
+
+  /* Mailchimp-style app chrome (inspired, not a replica) */
+  .mc-top{height:60px;background:#fff;border-bottom:1px solid var(--mc-line);display:flex;align-items:center;padding:0 24px;gap:18px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.3px}
+  .brand .dot{width:30px;height:30px;border-radius:50%;background:var(--mc-yellow);display:grid;place-items:center;font-size:16px}
+  .mc-top .nav{display:flex;gap:18px;color:var(--mc-muted);font-size:14px}
+  .mc-top .nav b{color:var(--mc-ink)}
+  .mc-top .acct{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:14px;color:var(--mc-muted)}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--mc-ink);color:var(--mc-yellow);display:grid;place-items:center;font-weight:700;font-size:13px}
+  .mc-body{flex:1;overflow:auto;padding:36px 48px}
+  .scene{display:none;max-width:980px;margin:0 auto;animation:fade .35s ease}
+  .scene.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.5px}
+  .sub{color:var(--mc-muted);margin:0 0 28px;font-size:16px}
+  .card{background:#fff;border:1px solid var(--mc-line);border-radius:var(--radius);padding:24px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px}
+  .stat .k{font-size:13px;color:var(--mc-muted)} .stat .v{font-size:26px;font-weight:700;margin-top:4px}
+  .hero{display:flex;gap:28px;align-items:center;background:var(--mc-ink);color:#fff;border-radius:18px;padding:32px 36px;position:relative;overflow:hidden}
+  .hero h2{margin:0 0 8px;font-size:26px;letter-spacing:-.3px}
+  .hero p{margin:0 0 20px;color:#D9D3CA;max-width:520px;line-height:1.5}
+  .hero .art{margin-left:auto;font-size:84px;line-height:1}
+  .btn{border:0;border-radius:10px;padding:14px 22px;font-weight:700;font-size:15px;background:var(--mc-yellow);color:var(--mc-ink);transition:transform .1s, box-shadow .2s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+  .btn.dark{background:var(--mc-ink);color:#fff}
+  .btn.ghost{background:transparent;border:1.5px solid var(--mc-ink)}
+  .pulse{animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,224,27,.7)}70%{box-shadow:0 0 0 14px rgba(255,224,27,0)}100%{box-shadow:0 0 0 0 rgba(255,224,27,0)}}
+
+  .checklist{list-style:none;padding:0;margin:20px 0 0}
+  .checklist li{display:flex;gap:12px;align-items:center;padding:10px 0;color:#bbb;transition:color .3s}
+  .checklist li.on{color:var(--mc-ink)}
+  .checklist .ic{width:24px;height:24px;border-radius:50%;border:2px solid #ddd;display:grid;place-items:center;font-size:13px;flex:none}
+  .checklist li.on .ic{background:var(--ok);border-color:var(--ok);color:#fff}
+  .checklist li.spin .ic{border-color:var(--mc-yellow);border-top-color:transparent;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Forms */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1.5px solid var(--mc-line);border-radius:10px;font:inherit;background:#fff}
+  .field input:focus,.field textarea:focus{outline:none;border-color:var(--mc-green)}
+  .field.full{grid-column:1/-1}
+  .prefill{font-size:11px;font-weight:600;background:#FFF7BF;color:#7A6500;padding:2px 7px;border-radius:999px;margin-left:6px}
+  .embed-frame{border:1.5px dashed transparent;border-radius:16px;position:relative}
+  .presenter-tag{display:none;position:absolute;top:-12px;right:16px;background:var(--tw-red);color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .show-wires .embed-frame{border-color:var(--tw-red)}
+  .show-wires .presenter-tag{display:block}
+  .rules{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .rule{font-size:12px;padding:4px 10px;border-radius:999px;background:#F1EEE7;color:var(--mc-muted)}
+  .rule.ok{background:#E3F4EA;color:var(--ok)} .rule.bad{background:#FBE7E5;color:var(--bad)}
+  .copybox{background:#FAF8F3;border:1px solid var(--mc-line);border-radius:12px;padding:14px 16px;margin-top:4px}
+  .copyrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed var(--mc-line);font-size:14px}
+  .copyrow:last-child{border:0}
+  .copyrow .lab{width:190px;color:var(--mc-muted);font-size:13px}
+  .copyrow code{background:#fff;border:1px solid var(--mc-line);padding:3px 8px;border-radius:6px;font-size:13px}
+  .copyrow button{margin-left:auto;border:0;background:transparent;color:var(--mc-green);font-weight:600;font-size:13px}
+  .stepnum{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--mc-ink);color:var(--mc-yellow);font-weight:700;font-size:13px;margin-right:8px}
+  .drop{border:2.5px dashed #CFC8BA;border-radius:16px;padding:34px;text-align:center;transition:all .2s;background:#FCFBF8;cursor:pointer}
+  .drop.over{border-color:var(--mc-green);background:#EAF6F7}
+  .drop.has{border-style:solid;border-color:var(--ok);background:#EFF8F2}
+  .drop .big{font-size:40px}
+  .drop small{color:var(--mc-muted)}
+  .linkbtn{border:0;background:none;color:var(--mc-green);font-weight:600;text-decoration:underline;padding:0}
+
+  /* Tracker + success */
+  .tracker{display:flex;gap:0;margin:8px 0 26px}
+  .tstep{flex:1;text-align:center;position:relative;font-size:13px;color:#aaa}
+  .tstep::before{content:"";position:absolute;top:15px;left:-50%;width:100%;height:3px;background:#E6E1D7;z-index:0}
+  .tstep:first-child::before{display:none}
+  .tstep .b{width:32px;height:32px;border-radius:50%;background:#E6E1D7;margin:0 auto 8px;display:grid;place-items:center;position:relative;z-index:1;font-weight:700;color:#fff;transition:all .3s}
+  .tstep.on{color:var(--mc-ink);font-weight:600}
+  .tstep.on .b{background:var(--ok)}
+  .tstep.on::before{background:var(--ok)}
+  .tstep.cur .b{background:var(--mc-yellow);color:var(--mc-ink);animation:pulse 1.5s infinite}
+  .tstep code{display:block;font-size:10.5px;color:var(--mc-muted);font-weight:500;margin-top:2px}
+  .timelapse{display:inline-block;font-size:12px;background:#F1EEE7;padding:3px 10px;border-radius:999px;color:var(--mc-muted)}
+  .success{display:none;grid-template-columns:1.2fr 1fr;gap:28px;align-items:center}
+  .success.show{display:grid;animation:fade .4s ease}
+  .confetti{font-size:46px}
+  .phone{width:270px;height:500px;border-radius:38px;background:#111;padding:12px;margin:0 auto;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .screen{background:#F2F2F7;border-radius:28px;height:100%;overflow:hidden;display:flex;flex-direction:column}
+  .phead{background:#fff;padding:22px 12px 10px;text-align:center;border-bottom:1px solid #ddd}
+  .phead .av{width:42px;height:42px;border-radius:50%;background:#9AA0A6;color:#fff;margin:0 auto 4px;display:grid;place-items:center;font-weight:700}
+  .phead .nm{font-size:13px;font-weight:600}
+  .pbody{padding:14px 10px;flex:1}
+  .bubble{background:#E5E5EA;border-radius:18px;padding:10px 13px;font-size:13.5px;line-height:1.35;max-width:88%;opacity:0;transform:translateY(10px);transition:all .4s}
+  .bubble.show{opacity:1;transform:none}
+  .pfoot{font-size:10.5px;color:#8a8a8e;text-align:center;padding:8px}
+
+  /* ---------- Behind the scenes panel ---------- */
+  .bts{width:0;overflow:hidden;background:var(--tw-navy);color:var(--tw-text);transition:width .45s ease;flex:none}
+  .stage.bts-open .bts{width:min(560px,46vw)}
+  .bts-inner{width:min(560px,46vw);height:100%;overflow:auto;padding:26px 28px 40px}
+  .kicker{color:var(--tw-red);font-weight:800;letter-spacing:1.4px;font-size:12px;text-transform:uppercase}
+  .bts h2{margin:6px 0 14px;font-size:24px;letter-spacing:-.3px}
+  .analogy{display:flex;gap:14px;background:linear-gradient(135deg,#24324F,#1A2540);border:1px solid #33456A;border-radius:14px;padding:14px 16px;margin-bottom:16px}
+  .analogy .em{font-size:30px;line-height:1}
+  .analogy b{display:block;color:#fff;margin-bottom:2px}
+  .analogy span{color:#C9D2E3;font-size:14.5px;line-height:1.45}
+  .bts ul{padding-left:18px;margin:0 0 16px;line-height:1.55;color:#D5DCEA;font-size:14.5px}
+  .bts li{margin-bottom:6px}
+  .bts li b{color:#fff}
+  .codewrap{background:#0A101C;border:1px solid #26344F;border-radius:12px;margin:0 0 16px;overflow:hidden}
+  .codehead{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--tw-muted);padding:8px 12px;border-bottom:1px solid #1E2A41}
+  pre{margin:0;padding:12px 14px;overflow:auto;font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#E6EDF3}
+  .tok-c{color:#7D8BA5;font-style:italic} .tok-s{color:#9FE3B4} .tok-k{color:#FF8FA0} .tok-h{color:#FFD479;font-weight:700}
+  .callout{border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.5;margin-bottom:14px}
+  .callout.honest{background:#2A2213;border:1px solid #6B5320;color:#F3DFAE}
+  .callout.tip{background:#13261F;border:1px solid #23573F;color:#BDE8CF}
+  .callout b{color:#fff}
+  .flow{display:flex;align-items:stretch;gap:6px;margin:4px 0 16px;flex-wrap:wrap}
+  .node{flex:1;min-width:92px;background:#1C2A42;border:1px solid #33456A;border-radius:10px;padding:9px 8px;text-align:center;font-size:12px;color:#C9D2E3}
+  .node b{display:block;color:#fff;font-size:12.5px;margin-bottom:2px}
+  .node.vip{border-color:var(--tw-red);background:#3A1A24}
+  .arrow{align-self:center;color:var(--tw-muted)}
+  .sources{font-size:12px;color:var(--tw-muted);border-top:1px solid #26344F;padding-top:12px;margin-top:8px}
+  .sources a{color:#9DB7FF;display:block;margin-top:4px;text-decoration:none}
+  .sources a:hover{text-decoration:underline}
+
+  /* ---------- Talk track ---------- */
+  .talk{position:fixed;left:20px;bottom:20px;max-width:560px;background:rgba(18,28,45,.96);color:var(--tw-text);border-radius:14px;padding:12px 16px 12px 14px;font-size:14px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,.3);display:none;z-index:20}
+  .talk.show{display:block}
+  .talk .lab{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--mc-yellow);text-transform:uppercase;margin-bottom:3px}
+  .hint{position:fixed;right:20px;bottom:16px;font-size:12px;color:var(--mc-muted);z-index:5}
+  .stage.bts-open ~ .hint{display:none}
+  kbd{background:#fff;border:1px solid var(--mc-line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- ================= Presenter bar ================= -->
+<div class="presenter">
+  <div class="title">SMS Onboarding Demo <small>Mailchimp × Twilio</small></div>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-country="us">🇺🇸 United States</button>
+    <button class="tab" data-country="es">🇪🇸 Spain</button>
+  </div>
+  <div class="stepper" id="stepper"></div>
+  <button class="ctrl" id="btnBack" title="Back (←)">←</button>
+  <button class="ctrl primary" id="btnNext" title="Next (→)">Next →</button>
+  <button class="ctrl" id="btnBts" title="Toggle behind-the-scenes (B)">Behind the scenes</button>
+  <button class="ctrl" id="btnTalk" title="Toggle talk track (N)">Notes</button>
+  <button class="ctrl" id="btnReset" title="Reset this flow (R)">↺</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="app">
+
+    <!-- ================= US FLOW ================= -->
+    <section class="country active" id="country-us">
+      <div class="mc-top">
+        <div class="brand"><div class="dot">🐵</div>mailchimp</div>
+        <div class="nav"><span>Campaigns</span><span>Audience</span><b>SMS</b><span>Automations</span><span>Analytics</span></div>
+        <div class="acct">Lucy's Blooms · Austin, TX <div class="avatar">LB</div></div>
+      </div>
+      <div class="mc-body">
+
+        <!-- Scene 1 -->
+        <div class="scene" data-scene="0">
+          <h1>Good morning, Lucy 👋</h1>
+          <p class="sub">Your email campaigns are doing great. Ready to reach customers where they look most?</p>
+          <div class="grid3">
+            <div class="card stat"><div class="k">Audience</div><div class="v">4,812</div></div>
+            <div class="card stat"><div class="k">Avg. open rate</div><div class="v">41.3%</div></div>
+            <div class="card stat"><div class="k">SMS-consented contacts</div><div class="v">1,206</div></div>
+          </div>
+          <div class="hero">
+            <div>
+              <h2>Text your customers in the US 📱</h2>
+              <p>Send SMS campaigns from a dedicated toll-free number. We'll handle setup and carrier verification for you.</p>
+              <button class="btn pulse" data-action="start">Start sending SMS campaigns in the US</button>
+              <ul class="checklist" data-checklist>
+                <li><span class="ic"></span>Creating your private SMS workspace</li>
+                <li><span class="ic"></span>Setting up your messaging service</li>
+                <li><span class="ic"></span>Reserving your toll-free number <b style="margin-left:6px" data-tfn hidden>+1 (888) 555-0142</b></li>
+                <li><span class="ic"></span>Preparing your verification form</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 2 -->
+        <div class="scene" data-scene="1">
+          <h1>Verify your business</h1>
+          <p class="sub">US carriers need to know who's texting. We've filled in what we already know — just check and submit. About 2 minutes.</p>
+          <div class="embed-frame">
+            <span class="presenter-tag">Twilio Compliance Embeddable · white-labeled</span>
+            <div class="card">
+              <div class="form-grid">
+                <div class="field"><label>Legal business name <span class="prefill">✨ from your profile</span></label><input value="Lucy's Blooms LLC"></div>
+                <div class="field"><label>Website <span class="prefill">✨ from your profile</span></label><input value="https://lucysblooms.com"></div>
+                <div class="field"><label>EIN (business registration number)</label><input value="12-3456789"></div>
+                <div class="field"><label>Business address <span class="prefill">✨ from your profile</span></label><input value="1100 S Congress Ave, Austin, TX 78704"></div>
+                <div class="field"><label>What will you send?</label><select><option>Marketing &amp; promotions</option><option>Account notifications</option></select></div>
+                <div class="field"><label>Monthly volume</label><select><option>1,000 – 10,000</option><option>Under 1,000</option></select></div>
+                <div class="field full"><label>Sample message <span class="prefill">✨ suggested</span></label><textarea rows="2">Lucy's Blooms: Spring is here! 🌷 20% off all bouquets this weekend with code SPRING20. Reply STOP to opt out.</textarea></div>
+                <div class="field full"><label>How do customers opt in? <span class="prefill">✨ from your signup form</span></label><input value="Checkbox on lucysblooms.com signup form (Mailchimp hosted form)"></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:20px">
+                <button class="btn dark" data-action="submit">Submit for verification</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 3 -->
+        <div class="scene" data-scene="2">
+          <h1>You're almost there</h1>
+          <p class="sub">We'll email you the moment you're approved. <span class="timelapse">⏩ demo time-lapse</span></p>
+          <div class="card">
+            <div class="tracker" data-tracker>
+              <div class="tstep"><div class="b">1</div>Submitted<code>PENDING_REVIEW</code></div>
+              <div class="tstep"><div class="b">2</div>In review<code>IN_REVIEW</code></div>
+              <div class="tstep"><div class="b">3</div>Approved<code>TWILIO_APPROVED</code></div>
+              <div class="tstep"><div class="b">4</div>Live 🎉</div>
+            </div>
+            <div class="success" data-success>
+              <div>
+                <div class="confetti">🎉</div>
+                <h2 style="margin:6px 0 8px;font-size:26px">Congratulations! Your registration is complete.</h2>
+                <p class="sub" style="margin-bottom:20px">You can now start your first SMS campaign from <b>+1 (888) 555-0142</b>.</p>
+                <button class="btn pulse" data-action="send">Send my first SMS campaign</button>
+              </div>
+              <div class="phone"><div class="screen">
+                <div class="phead"><div class="av">LB</div><div class="nm">+1 (888) 555-0142</div></div>
+                <div class="pbody"><div class="bubble" data-bubble>Lucy's Blooms: Spring is here! 🌷 20% off all bouquets this weekend with code SPRING20. Reply STOP to opt out.</div></div>
+                <div class="pfoot">Text Message · Today 10:02 AM</div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ================= SPAIN FLOW ================= -->
+    <section class="country" id="country-es">
+      <div class="mc-top">
+        <div class="brand"><div class="dot">🐵</div>mailchimp</div>
+        <div class="nav"><span>Campaigns</span><span>Audience</span><b>SMS</b><span>Automations</span><span>Analytics</span></div>
+        <div class="acct">Floristería Lucía · Madrid <div class="avatar">FL</div></div>
+      </div>
+      <div class="mc-body">
+
+        <!-- Scene 1 -->
+        <div class="scene" data-scene="0">
+          <h1>¡Buenos días, Lucía! 👋</h1>
+          <p class="sub">Your email campaigns are doing great. Ready to reach customers where they look most?</p>
+          <div class="grid3">
+            <div class="card stat"><div class="k">Audience</div><div class="v">3,407</div></div>
+            <div class="card stat"><div class="k">Avg. open rate</div><div class="v">38.9%</div></div>
+            <div class="card stat"><div class="k">SMS-consented contacts</div><div class="v">982</div></div>
+          </div>
+          <div class="hero">
+            <div>
+              <h2>Text your customers in Spain 📱</h2>
+              <p>Send SMS campaigns under your own brand name — like <b style="color:var(--mc-yellow)">FloresLucia</b> — instead of a phone number.</p>
+              <button class="btn pulse" data-action="start">Start sending SMS campaigns in Spain</button>
+              <ul class="checklist" data-checklist>
+                <li><span class="ic"></span>Creating your private SMS workspace</li>
+                <li><span class="ic"></span>Setting up your messaging service for Spain</li>
+                <li><span class="ic"></span>Preparing your Spanish sender registration</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 2 -->
+        <div class="scene" data-scene="1">
+          <h1>Register your sender name</h1>
+          <p class="sub">Spain requires every SMS sender name to be in the national registry (CNMC). We've prepared everything — three quick steps.</p>
+          <div class="card" style="margin-bottom:16px">
+            <div style="font-weight:700;margin-bottom:12px"><span class="stepnum">1</span>Choose the name your customers will see</div>
+            <div class="field"><input id="es-sender" value="FloresLucia" maxlength="14" style="font-size:18px;font-weight:700;max-width:340px"></div>
+            <div class="rules" id="es-rules"></div>
+          </div>
+          <div class="card" style="margin-bottom:16px">
+            <div style="font-weight:700;margin-bottom:6px"><span class="stepnum">2</span>Register it on the CNMC Alias Registry</div>
+            <p class="sub" style="margin:0 0 10px;font-size:14px">Sign in with your company's digital certificate and paste these values — they must match exactly.</p>
+            <div class="copybox">
+              <div class="copyrow"><span class="lab">Alias (sender name)</span><code data-alias>FloresLucia</code><button>Copy</button></div>
+              <div class="copyrow"><span class="lab">PRO (registered provider)</span><code>Twilio Ireland Limited</code><button>Copy</button></div>
+              <div class="copyrow"><span class="lab">Tercero (third party)</span><code>[Mailchimp legal entity]</code><button>Copy</button></div>
+              <div class="copyrow"><span class="lab">Tercero tax ID</span><code>[Mailchimp tax ID]</code><button>Copy</button></div>
+            </div>
+            <div style="margin-top:14px"><button class="btn ghost" onclick="return false">Open CNMC Alias Registry ↗</button></div>
+          </div>
+          <div class="card">
+            <div style="font-weight:700;margin-bottom:12px"><span class="stepnum">3</span>Upload your CNMC receipt (Justificante)</div>
+            <div class="drop" id="es-drop">
+              <div class="big">📄</div>
+              <div style="font-weight:700;margin:6px 0">Drag &amp; drop your Justificante here</div>
+              <small>PDF from the CNMC portal · or <button class="linkbtn" id="es-sample">use sample file</button></small>
+              <input type="file" id="es-file" hidden accept=".pdf,.png,.jpg">
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:20px">
+              <button class="btn dark" data-action="submit" id="es-submit" disabled>Submit registration</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 3 -->
+        <div class="scene" data-scene="2">
+          <h1>You're almost there</h1>
+          <p class="sub">We'll email you the moment your sender name is live. <span class="timelapse">⏩ demo time-lapse</span></p>
+          <div class="card">
+            <div class="tracker" data-tracker>
+              <div class="tstep"><div class="b">1</div>Submitted<code>Justificante received</code></div>
+              <div class="tstep"><div class="b">2</div>Twilio review<code>Fast Track</code></div>
+              <div class="tstep"><div class="b">3</div>CNMC approved<code>Alias registered</code></div>
+              <div class="tstep"><div class="b">4</div>Live 🎉</div>
+            </div>
+            <div class="success" data-success>
+              <div>
+                <div class="confetti">🎉</div>
+                <h2 style="margin:6px 0 8px;font-size:26px">¡Enhorabuena! Your registration is complete.</h2>
+                <p class="sub" style="margin-bottom:20px">You can now start your first SMS campaign as <b data-alias>FloresLucia</b>.</p>
+                <button class="btn pulse" data-action="send">Send my first SMS campaign</button>
+              </div>
+              <div class="phone"><div class="screen">
+                <div class="phead"><div class="av">FL</div><div class="nm" data-alias>FloresLucia</div></div>
+                <div class="pbody"><div class="bubble" data-bubble>¡Llegó la primavera! 🌷 20% en todos los ramos este fin de semana con el código PRIMAVERA. Baja: mc.link/baja</div></div>
+                <div class="pfoot">SMS · Hoy 10:02</div>
+              </div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= Behind the scenes ================= -->
+  <aside class="bts"><div class="bts-inner" id="bts"></div></aside>
+</div>
+
+<div class="talk" id="talk"><div class="lab">Talk track</div><div id="talkText"></div></div>
+<div class="hint"><kbd>←</kbd> <kbd>→</kbd> steps · <kbd>B</kbd> behind the scenes · <kbd>N</kbd> notes · <kbd>1</kbd>/<kbd>2</kbd> country · <kbd>W</kbd> show embed</div>
+
+<script>
+/* =====================================================================
+   CONTENT — 6 steps per country: odd = customer view, even = behind the scenes
+   ===================================================================== */
+const STEP_LABELS = ["1 · Start", "2 · Scale", "3 · Register", "4 · Review", "5 · Live", "6 · Trust"];
+
+const CONTENT = {
+  us: {
+    talk: [
+      "Meet Lucy. She runs a flower shop in Austin and already uses Mailchimp for email. She wants SMS. Watch how much work she has to do: one click.",
+      "That click just did a lot. Mailchimp gave Lucy her own Twilio subaccount and Messaging Service, then reserved a toll-free number. It's the same code whether it's Lucy or ten thousand Lucys.",
+      "US carriers require toll-free verification. Lucy sees a short Mailchimp-branded form that's mostly filled in already. She checks it and clicks submit.",
+      "That form is Twilio's Compliance Embeddable. Mailchimp doesn't maintain the regulatory questions; Twilio does. Fast Track gives Mailchimp a dedicated onboarding manager and SLAs on Twilio's review.",
+      "A few days later (time-lapsed here), Lucy is approved and sends her first campaign.",
+      "And it stays safe. The Compliance Toolkit checks every US message for quiet hours, consent and known litigators, so Mailchimp and Lucy stay on the right side of the TCPA."
+    ],
+    bts: {
+      2: {
+        title: "Onboarding at scale: one API call per building block",
+        analogy: ["🏢", "Every customer gets their own apartment", "Own keys, own mailbox, own meter. If one neighbor throws a wild party, nobody else gets evicted."],
+        bullets: [
+          "<b>Subaccount per customer</b>: isolates traffic, billing and reputation. This is Twilio's recommended ISV architecture.",
+          "<b>Messaging Service</b>: the customer's sender pool and settings in one place.",
+          "<b>Toll-free number</b>: searched, bought and attached in three calls.",
+          "The same loop runs for <b>1 or 10,000 customers</b>, including back-filling your existing base."
+        ],
+        code: ["Node.js · twilio-node", `// Creating a subaccount for Lucy's business (her own isolated workspace)
+const sub = await parent.api.v2010.accounts.create({
+  friendlyName: "Lucy's Blooms · mc_48213"
+});
+
+// Pointing the client at the new subaccount (parent credentials, sub scope)
+const client = twilio(PARENT_SID, PARENT_TOKEN, { accountSid: sub.sid });
+
+// Creating a Messaging Service (holds Lucy's senders and settings)
+const svc = await client.messaging.v1.services.create({
+  friendlyName: "US SMS · Lucy's Blooms"
+});
+
+// Searching for an available SMS-capable US toll-free number
+const [tf] = await client.availablePhoneNumbers("US")
+  .tollFree.list({ smsEnabled: true, limit: 1 });
+
+// Buying that toll-free number into Lucy's subaccount
+const num = await client.incomingPhoneNumbers.create({
+  phoneNumber: tf.phoneNumber
+});
+
+// Adding the number to Lucy's Messaging Service sender pool
+await client.messaging.v1.services(svc.sid)
+  .phoneNumbers.create({ phoneNumberSid: num.sid });`],
+        sources: [
+          ["ISV messaging architecture (subaccount per customer)", "https://www.twilio.com/docs/messaging/compliance/a2p-10dlc/onboarding-isv"],
+          ["Messaging Services", "https://www.twilio.com/docs/messaging/services"]
+        ]
+      },
+      4: {
+        title: "Compliance Embeddable + Fast Track",
+        analogy: ["✈️", "Fast Track is the VIP lane at the airport", "Same security rules for everyone, but a dedicated agent walks you through and the line moves on a guaranteed schedule."],
+        bullets: [
+          "<b>Server side</b>: Mailchimp starts a ComplianceInquiry and pre-fills everything it already knows.",
+          "<b>Client side</b>: a white-label React component themed to Mailchimp, with no Twilio branding.",
+          "Twilio maintains the regulatory question flows. <b>Mailchimp's engineers don't chase rule changes.</b>",
+          "Want to skip the UI? The <b>Toll-Free Verification API</b> submits directly, which works well for bulk back-fills.",
+          "<b>Fast Track Onboarding Package</b>: a dedicated onboarding manager, SLAs, and on average 40% faster time to market."
+        ],
+        code: ["HTTP + React", `// Starting a toll-free verification inquiry, pre-filled with Lucy's data
+// (server side, authenticated as Lucy's subaccount)
+POST https://trusthub.twilio.com/v1/ComplianceInquiries/Tollfree/Initialize
+  TollfreePhoneNumber=+18885550142
+  NotificationEmail=lucy@lucysblooms.com
+  BusinessName=Lucy's Blooms LLC
+  BusinessWebsite=https://lucysblooms.com
+  ThemeSetId=<mailchimp-theme>
+→ { "inquiry_id": "...", "inquiry_session_token": "..." }
+
+// Rendering the white-label verification form inside Mailchimp's UI
+// (client side · npm i @twilio/twilio-compliance-embed)
+<TwilioComplianceEmbed
+  inquiryId={inquiry_id}
+  inquirySessionToken={inquiry_session_token}
+  onInquirySubmitted={() => track("tfv_submitted")}
+/>`],
+        callout: ["tip", "<b>Prerequisites:</b> request access to the Compliance Embeddable API, and Mailchimp's Trust Hub profile must be approved as <i>ISV / Reseller</i>. Press <kbd>W</kbd> to outline the embedded area on the form."],
+        sources: [
+          ["Toll-Free Compliance Embeddable", "https://www.twilio.com/docs/messaging/compliance/toll-free/compliance-embeddable-onboarding"],
+          ["Toll-Free Verification API", "https://www.twilio.com/docs/messaging/compliance/toll-free/api-onboarding"],
+          ["A2P Fast Track Onboarding Packages", "https://www.twilio.com/en-us/blog/products/launches/a2p-fast-track-onboarding-packages"]
+        ]
+      },
+      6: {
+        title: "Compliance Toolkit: trust on every message",
+        analogy: ["🧑‍✈️", "A co-pilot running the pre-flight checklist", "Before every take-off it checks the weather: is it 2am where the recipient lives? Did they opt out? If so, it holds the message or blocks it."],
+        bullets: [
+          "<b>Quiet Hours</b>: marketing messages sent at night are automatically rescheduled for the morning.",
+          "<b>Consent</b>: the Consent Management API syncs opt-ins and opt-outs, and blocked sends return <b>21610</b>.",
+          "<b>Known litigators</b>: high-risk recipients are blocked with <b>30640</b>.",
+          "Results show up in <b>Messaging Insights</b> for Mailchimp's trust and safety team."
+        ],
+        code: ["Node.js · twilio-node", `// Sending Lucy's first campaign message through her Messaging Service
+// (her toll-free number is picked automatically)
+await client.messages.create({
+  messagingServiceSid: svc.sid,
+  to: "+15125550199",
+  body: "Lucy's Blooms: Spring is here! 🌷 20% off ... Reply STOP to opt out."
+});
+// Compliance Toolkit evaluates US traffic before sending:
+// quiet hours → rescheduled · no consent → 21610 · litigator → 30640`],
+        callout: ["honest", "<b>Scope:</b> the Compliance Toolkit currently supports SMS to the US, in English. Its docs also describe a message-intent setting; confirm the exact API field with the product team before showing it."],
+        sources: [
+          ["Compliance Toolkit", "https://www.twilio.com/docs/messaging/features/compliance-toolkit"],
+          ["Consent Management API", "https://www.twilio.com/docs/messaging/features/consent-api"]
+        ]
+      }
+    }
+  },
+
+  es: {
+    talk: [
+      "Now meet Lucía. Same story, but she runs a flower shop in Madrid. She wants her texts to come from her brand name, not a phone number. Again: one click.",
+      "Same building blocks as the US: her own subaccount and Messaging Service, created by API. Spain uses an alphanumeric sender ID instead of a phone number, so no number to buy.",
+      "Spain is stricter. Since September 15, 2026, every sender name must be in the CNMC national registry, or messages are blocked. Mailchimp does the hard part: it checks her name against the rules and gives her the exact values to paste. Lucía registers and drops in her receipt.",
+      "Behind the scenes, Mailchimp sends that proof to Twilio, and Fast Track moves it through Twilio's review. Twilio is the registered provider at the CNMC, so once the CNMC approves, the name gets activated.",
+      "Once approved (time-lapsed here), FloresLucia goes live on her Messaging Service with one API call.",
+      "Trust in Spain means the registered name on every message, nothing unregistered leaking through, a clear opt-out in every text, and fraud protection on by default."
+    ],
+    bts: {
+      2: {
+        title: "Same blueprint, new country",
+        analogy: ["🏢", "Same apartment building, Spanish address", "The building blocks are identical to the US, so Mailchimp writes this once and reuses it in every market."],
+        bullets: [
+          "<b>Subaccount + Messaging Service</b> per customer, the same code as the US flow.",
+          "Spain uses an <b>alphanumeric sender ID</b> (the brand name) instead of a phone number.",
+          "Sender IDs are <b>one-way</b>: customers can't reply, which suits marketing campaigns.",
+          "The sender ID is attached to the Messaging Service only <b>after</b> it's registered (step 5)."
+        ],
+        code: ["Node.js · twilio-node", `// Creating a subaccount for Lucía's business (her own isolated workspace)
+const sub = await parent.api.v2010.accounts.create({
+  friendlyName: "Floristería Lucía · mc_77104"
+});
+
+// Pointing the client at the new subaccount (parent credentials, sub scope)
+const client = twilio(PARENT_SID, PARENT_TOKEN, { accountSid: sub.sid });
+
+// Creating a Messaging Service (will hold her registered sender ID)
+const svc = await client.messaging.v1.services.create({
+  friendlyName: "ES SMS · Floristería Lucía"
+});
+// No number to buy: Spain uses a registered alphanumeric sender ID`],
+        sources: [
+          ["Alphanumeric Sender IDs in Messaging Services", "https://www.twilio.com/docs/messaging/services/alphanumeric-sender-ids-in-messaging-services"]
+        ]
+      },
+      4: {
+        title: "From CNMC receipt to registered sender",
+        analogy: ["✈️", "Fast Track is the VIP lane, up to passport control", "Twilio's checkpoint moves fast with a dedicated agent. The CNMC is the border, and everyone shows the same passport there."],
+        flow: [
+          ["Lucía", "Registers on CNMC portal"],
+          ["Mailchimp", "Collects Justificante"],
+          ["Twilio", "Review · Fast Track", true],
+          ["CNMC", "Alias approved"],
+          ["Live", "Sender ID activated"]
+        ],
+        bullets: [
+          "<b>CNMC</b>: Spain's regulator. Since <b>Sept 15, 2026</b>, unregistered sender IDs are blocked with error <b>21612</b>.",
+          "Lucía lists <b>Twilio Ireland Limited as PRO</b> and <b>Mailchimp as Tercero</b>. Exact matches are required, so Mailchimp pre-fills them.",
+          "The <b>Justificante</b> is the CNMC's receipt, and it's Twilio's proof of submission.",
+          "<b>Fast Track</b> covers sender ID applications: a dedicated onboarding manager and SLAs on Twilio's review."
+        ],
+        callout: ["honest", "<b>How it works today:</b> companies registered in Spain must self-register with the CNMC (that needs a Spanish digital certificate). The hand-off to Twilio is a Console flow today, and there's no public sender ID registration API yet. Non-Spanish companies can use <i>Twilio as Authorized Representative</i>, which needs an ISV supplemental agreement. <b>Ask:</b> is a Compliance Embeddable for Spanish sender IDs on the roadmap? That would make this match the US flow."],
+        sources: [
+          ["Register your Sender ID via Twilio in Spain", "https://help.twilio.com/articles/49112863248411"],
+          ["Self-register with CNMC", "https://help.twilio.com/articles/54002265619227"],
+          ["ISV guidance for Spain Sender IDs", "https://help.twilio.com/articles/55341217959579"]
+        ]
+      },
+      6: {
+        title: "Trust & compliance in Spain",
+        analogy: ["🛂", "A registered name badge on every message", "Carriers check the badge at the door. Twilio makes sure only registered badges go out, so nobody gets turned away."],
+        bullets: [
+          "<b>AlphaSender API</b> activates the registered name on Lucía's Messaging Service.",
+          "The Messaging Service picks the sender ID automatically for Spanish numbers, so <b>no unregistered sender leaks through</b> (avoids 21612 and 30042).",
+          "<b>Opt-out in the message body</b>: sender IDs are one-way, so replying STOP doesn't work.",
+          "<b>SMS Pumping Protection</b> and per-customer subaccounts keep fraud and bad actors contained."
+        ],
+        code: ["Node.js · twilio-node", `// Adding the CNMC-approved sender ID to Lucía's Messaging Service
+await client.messaging.v1.services(svc.sid)
+  .alphaSenders.create({ alphaSender: "FloresLucia" });
+
+// Sending Lucía's first campaign message to a Spanish number
+// (the Messaging Service sends it as "FloresLucia")
+await client.messages.create({
+  messagingServiceSid: svc.sid,
+  to: "+34600123456",
+  body: "¡Llegó la primavera! 🌷 20% ... Baja: mc.link/baja"
+});`],
+        callout: ["tip", "<b>Compliance Toolkit</b> is US-only today, so in Spain trust comes from the CNMC registry and the controls above. Switch to the 🇺🇸 tab to show the Toolkit."],
+        sources: [
+          ["AlphaSender resource", "https://www.twilio.com/docs/messaging/api/alphasender-resource"],
+          ["Error 30042: unregistered or generic sender ID", "https://www.twilio.com/docs/api/errors/30042"],
+          ["SMS Pumping Protection", "https://www.twilio.com/docs/messaging/features/sms-pumping-protection-programmable-messaging"]
+        ]
+      }
+    }
+  }
+};
+
+/* =====================================================================
+   STATE & RENDERING
+   ===================================================================== */
+const state = { country: "us", us: { step: 1, flags: {} }, es: { step: 1, flags: {} } };
+let showBts = true;   // auto-open on "behind" steps
+let showTalk = false;
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const root = () => $("#country-" + state.country);
+const cur = () => state[state.country];
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function highlight(code){
+  return esc(code).replace(
+    /((?<![:\w])\/\/.*$|^#.*$)|("(?:[^"\\]|\\.)*")|\b(const|await|import|from|return|new)\b|^(POST|GET)\b/gm,
+    (m, c, s, k, h) => c ? `<span class="tok-c">${c}</span>` : s ? `<span class="tok-s">${s}</span>` : k ? `<span class="tok-k">${k}</span>` : `<span class="tok-h">${h}</span>`
+  );
+}
+
+function renderBts(){
+  const step = cur().step;
+  const d = CONTENT[state.country].bts[step];
+  const isBehind = step % 2 === 0;
+  $("#stage").classList.toggle("bts-open", isBehind && showBts);
+  if (!d) return;
+  let h = `<div class="kicker">Behind the scenes · Step ${step} of 6 · ${state.country === "us" ? "🇺🇸 US" : "🇪🇸 Spain"}</div><h2>${d.title}</h2>`;
+  h += `<div class="analogy"><div class="em">${d.analogy[0]}</div><div><b>${d.analogy[1]}</b><span>${d.analogy[2]}</span></div></div>`;
+  if (d.flow){
+    h += `<div class="flow">` + d.flow.map((n,i) => `${i?'<span class="arrow">→</span>':''}<div class="node ${n[2]?'vip':''}"><b>${n[0]}</b>${n[1]}</div>`).join("") + `</div>`;
+  }
+  h += `<ul>${d.bullets.map(b => `<li>${b}</li>`).join("")}</ul>`;
+  if (d.code) h += `<div class="codewrap"><div class="codehead"><span>${d.code[0]}</span><span>validated against Twilio docs</span></div><pre>${highlight(d.code[1])}</pre></div>`;
+  if (d.callout) h += `<div class="callout ${d.callout[0]}">${d.callout[1]}</div>`;
+  h += `<div class="sources">Sources${d.sources.map(s => `<a href="${s[1]}" target="_blank" rel="noopener">↗ ${s[0]}</a>`).join("")}</div>`;
+  $("#bts").innerHTML = h;
+  $("#bts").scrollTop = 0;
+}
+
+function renderStepper(){
+  const step = cur().step;
+  $("#stepper").innerHTML = STEP_LABELS.map((l,i) => {
+    const n = i + 1, kind = n % 2 ? "ui" : "bts";
+    return `<span class="pill ${kind} ${n===step?'active':''} ${n<step?'done':''}">${l}</span>`;
+  }).join("");
+}
+
+function render(){
+  $$(".tab").forEach(t => t.classList.toggle("active", t.dataset.country === state.country));
+  $$(".country").forEach(c => c.classList.toggle("active", c.id === "country-" + state.country));
+  const step = cur().step;
+  const scene = Math.floor((step - 1) / 2);
+  $$(".scene", root()).forEach(s => s.classList.toggle("active", +s.dataset.scene === scene));
+  renderStepper();
+  renderBts();
+  $("#talkText").textContent = CONTENT[state.country].talk[step - 1];
+  $("#talk").classList.toggle("show", showTalk);
+  $("#btnNext").disabled = step === 6;
+  $("#btnBack").disabled = step === 1;
+}
+
+function go(step){
+  const c = cur();
+  step = Math.max(1, Math.min(6, step));
+  // Entering a scene by "Next" without doing the customer action: auto-complete it so the demo never gets stuck
+  if (step > c.step && c.step % 2 === 1) runAction(c.step, true);
+  c.step = step;
+  render();
+}
+
+/* ---------- customer actions (step 1, 3, 5) ---------- */
+function runAction(step, instant){
+  const c = cur(), r = root();
+  if (c.flags[step]) return; c.flags[step] = true;
+  if (step === 1){
+    const items = $$("[data-checklist] li", r);
+    $("[data-action=start]", r).disabled = true;
+    $("[data-action=start]", r).classList.remove("pulse");
+    const done = () => { items.forEach(li => { li.classList.remove("spin"); li.classList.add("on"); li.querySelector(".ic").textContent = "✓"; });
+      const tfn = $("[data-tfn]", r); if (tfn) tfn.hidden = false; };
+    if (instant) return done();
+    items.forEach((li, i) => {
+      setTimeout(() => li.classList.add("spin"), i * 650);
+      setTimeout(() => { li.classList.remove("spin"); li.classList.add("on"); li.querySelector(".ic").textContent = "✓";
+        if (i === 2){ const tfn = $("[data-tfn]", r); if (tfn) tfn.hidden = false; } }, i * 650 + 600);
+    });
+    setTimeout(() => { if (cur() === c && c.step === 1) go(2); }, items.length * 650 + 500);
+  }
+  if (step === 3){
+    if (state.country === "es" && !instant){ const b = $("#es-submit"); b.textContent = "Submitting…"; }
+    if (!instant) setTimeout(() => { if (cur() === c && c.step === 3) go(4); }, 600);
+    if (state.country === "es" && !$("#es-drop").classList.contains("has")) attachFile("Justificante_CNMC_FloresLucia.pdf");
+  }
+  if (step === 5){
+    const b = $("[data-bubble]", r);
+    $("[data-action=send]", r).disabled = true;
+    $("[data-action=send]", r).classList.remove("pulse");
+    setTimeout(() => b.classList.add("show"), instant ? 0 : 300);
+    if (!instant) setTimeout(() => { if (cur() === c && c.step === 5) go(6); }, 1700);
+  }
+}
+
+/* status tracker time-lapse when entering step 5 */
+function playTracker(){
+  const c = cur(), r = root();
+  if (c.flags.tracker) return; c.flags.tracker = true;
+  const steps = $$("[data-tracker] .tstep", r);
+  steps.forEach((s, i) => {
+    setTimeout(() => { steps.forEach(x => x.classList.remove("cur")); s.classList.add("on"); if (steps[i+1]) steps[i+1].classList.add("cur"); }, 500 + i * 900);
+  });
+  setTimeout(() => $("[data-success]", r).classList.add("show"), 500 + steps.length * 900);
+}
+
+/* ---------- Spain: sender ID rules + upload ---------- */
+const GENERIC = ["message","messages","alert","alerts","info","bank","sms","notice","promo","test","mensaje","aviso"];
+function checkSender(){
+  const v = $("#es-sender").value;
+  const rules = [
+    ["1–11 characters", v.length >= 1 && v.length <= 11],
+    ["Letters, numbers & spaces only", /^[A-Za-z0-9 ]*$/.test(v)],
+    ["No accents (á é í ó ú)", !/[áéíóúÁÉÍÓÚ]/.test(v)],
+    ["Not numbers only", /[A-Za-z]/.test(v)],
+    ["No leading/trailing/double spaces", !/^ | $|  /.test(v)],
+    ["Not a generic word", !GENERIC.includes(v.trim().toLowerCase())]
+  ];
+  $("#es-rules").innerHTML = rules.map(([t, ok]) => `<span class="rule ${ok?'ok':'bad'}">${ok?'✓':'✗'} ${t}</span>`).join("");
+  $$("[data-alias]").forEach(el => el.textContent = v || "—");
+  const valid = rules.every(r => r[1]);
+  $("#es-sender").style.borderColor = valid ? "var(--ok)" : "var(--bad)";
+  $("#es-sender").dataset.valid = valid;
+  updateEsSubmit();
+}
+function updateEsSubmit(){
+  $("#es-submit").disabled = !($("#es-sender").dataset.valid === "true" && $("#es-drop").classList.contains("has"));
+}
+function attachFile(name){
+  const d = $("#es-drop");
+  d.classList.add("has");
+  d.innerHTML = `<div class="big">✅</div><div style="font-weight:700;margin:6px 0">${esc(name)}</div><small>Uploaded securely · ready to submit</small>`;
+  updateEsSubmit();
+}
+
+/* =====================================================================
+   WIRING
+   ===================================================================== */
+document.addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  if (tab){ state.country = tab.dataset.country; render(); return; }
+  const a = e.target.closest("[data-action]");
+  if (a && !a.disabled){ runAction(cur().step, false); }
+  if (e.target.closest(".copyrow button")){ const b = e.target; b.textContent = "Copied ✓"; setTimeout(() => b.textContent = "Copy", 1200); }
+});
+$("#btnNext").onclick = () => go(cur().step + 1);
+$("#btnBack").onclick = () => go(cur().step - 1);
+$("#btnBts").onclick = () => { showBts = !showBts; renderBts(); };
+$("#btnTalk").onclick = () => { showTalk = !showTalk; render(); };
+$("#btnReset").onclick = () => location.reload();
+
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, textarea, select")) return;
+  if (e.key === "ArrowRight") go(cur().step + 1);
+  else if (e.key === "ArrowLeft") go(cur().step - 1);
+  else if (e.key.toLowerCase() === "b") $("#btnBts").click();
+  else if (e.key.toLowerCase() === "n") $("#btnTalk").click();
+  else if (e.key.toLowerCase() === "r") location.reload();
+  else if (e.key.toLowerCase() === "w") document.body.classList.toggle("show-wires");
+  else if (e.key === "1"){ state.country = "us"; render(); }
+  else if (e.key === "2"){ state.country = "es"; render(); }
+});
+
+// Spain upload
+const drop = $("#es-drop");
+drop.addEventListener("click", e => { if (e.target.id === "es-sample"){ e.stopPropagation(); attachFile("Justificante_CNMC_FloresLucia.pdf"); return; } if (!drop.classList.contains("has")) $("#es-file").click(); });
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) attachFile(e.dataTransfer.files[0].name); });
+$("#es-file").addEventListener("change", e => { if (e.target.files[0]) attachFile(e.target.files[0].name); });
+$("#es-sender").addEventListener("input", checkSender);
+
+// Play tracker whenever we land on step 5
+const _render = render;
+render = function(){ _render(); if (cur().step === 5) playTracker(); };
+
+checkSender();
+render();
+</script>
+</body>
+</html>
